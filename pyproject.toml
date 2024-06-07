@@ -7,7 +7,7 @@ build-backend = "flit_core.buildapi"
 # See https://www.python.org/dev/peps/pep-0621/
 name = "compchem-si"
 dynamic = ["version"] # read from compchem_si/__init__.py
-description = "A plugin for extracting data from .sum files and manipuating them"
+description = "A plugin for generating SI data from Gaussian output files"
 authors = [{name = "Kevin Lefrancois-Gagnon", email = "kgagnon@lakeheadu.ca"}, {name = "Robert Mawhinney", email = "rmawhinn@lakeheadu.ca"}]
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -29,7 +29,8 @@ dependencies = [
     "pandas",
     "pillow",
     "mogli",
-    "reportlab"
+    "reportlab",
+    "cclib"
 ]
 
 [project.urls]

@@ -2,6 +2,8 @@
 Module to take Gaussian output files and generate SI pdf pages
 
 """
+import os
+
 # pylint:disable=import-error
 import subprocess
 
@@ -142,6 +144,15 @@ no_to_symb = {
 
 
 def _get_geom(data):
+    """Gets the geometry of the optimized structure from cclib parsed data
+
+    Args:
+        data: cclib data
+
+    Returns:
+        geometry as a list of lists with symbols and xyz coordinates
+
+    """
     opt_geom = data.atomcoords[data.OPT_DONE - 1]
     atom_symb = [no_to_symb[no] for no in data.atomnos]
     geom_array = np.c_[np.array(atom_symb), opt_geom]
@@ -160,17 +171,39 @@ def _write_image(data, log_file):
         None, but writes image to file
 
     """
+    if not os.path.exists("png_files/"):
+        os.mkdir("png_files")
+    if not os.path.exists("xyz_files/"):
+        os.mkdir("xyz_files")
+
     xyz_file = log_file.replace(".log", ".xyz")
     png_file = log_file.replace(".log", ".png")
-    cclib.io.ccwrite(data, "xyz", xyz_file, indices=data.OPT_DONE - 1)
+    cclib.io.ccwrite(data, "xyz", f"xyz_files/{xyz_file}", indices=data.OPT_DONE - 1)
     subprocess.check_output(
-        ["obabel", xyz_file, "-O", png_file, "-xp", "600", "-x0", "molfile"],
+        [
+            "obabel",
+            f"xyz_files/{xyz_file}",
+            "-O",
+            f"png_files/{png_file}",
+            "-xp",
+            "600",
+            "-x0",
+            "molfile",
+        ],
         text=True,
     )
 
 
 def parse_log_file(log_file):
-    """Take a log file and get the geometry and energy values"""
+    """Take a log file and get the geometry and energy values
+
+    Args:
+        log_file: the name of a .log file
+
+    Returns:
+        the energy and geometry of the molecule in the .log file, and an image written to log_file.png
+
+    """
     data = cclib.io.ccread(log_file)
     geom_array = _get_geom(data)
     energy = data.scfenergies[data.OPT_DONE - 1]
@@ -178,30 +211,59 @@ def parse_log_file(log_file):
     return energy, geom_array
 
 
-def constuct_si(log_files: list[str]):
-    """Construct the Supplementary Information"""
-    doc = SimpleDocTemplate("test.pdf")
+def constuct_si(log_file_list="dir", out_name="SupplementaryInformation.pdf"):
+    """Construct the Supplementary Information
+
+    Args:
+        log_file_list: either 'dir' to run for all .log files in the current directory or a list of .log files to run
+        out_name: name for the resulting document including the .pdf extension
+
+    Returns:
+        None, but writes generated SI to out_name
+    """
+    if log_file_list == "dir":
+        log_file_list = [file for file in os.listdir() if file.endswith(".log")]
+    doc = SimpleDocTemplate(out_name)
     story = []
-    for log_file in log_files:
+    for log_file in log_file_list:
         story = construct_si_page(log_file, story)
     doc.build(story)
 
 
 def construct_si_page(log_file, story):
-    """For a given molecule, construct the SI page"""
+    """For a given molecule, construct the SI page
+
+    Args:
+        log_file: log file name
+        story: list containing platypus flowables from reportlab for the document being built
+
+    Returns:
+        the story input updated with the current page being built
+
+    """
     energy, geom = parse_log_file(log_file)
-    story = supporting_info_page(story, energy, geom, log_file)
+    story = _supporting_info_page(story, energy, geom, log_file)
     return story
 
 
-def supporting_info_page(story, energy, geom, log_file):
-    """Construct a SI page for a given molecule"""
+def _supporting_info_page(story, energy, geom, log_file):
+    """Construct a SI page for a given molecule
+
+    Args:
+        story: list containing platypus flowables from reportlab for the document being built
+        Energy: the energy for the molecule in the .log file
+        geom: list[list] the geometry of the molecule
+        log_file: the log file name
+
+    Returns:
+        the story input updated with the current page being built
+    """
 
     p = Paragraph("<font size=20>Structure</font>")
     story.append(p)
     story.append(Spacer(1, 0.2 * inch))
 
-    I = Image(log_file.replace(".log", ".png"))
+    I = Image(f'png_files/{log_file.replace(".log", ".png")}')
     I.drawHeight = 2 * inch
     I.drawWidth = 2 * inch
     story.append(I)
@@ -215,3 +277,8 @@ def supporting_info_page(story, energy, geom, log_file):
     story.append(t)
     story.append(PageBreak())
     return story
+
+
+if __name__ == "__main__":
+    log_files = [file for file in os.listdir() if file.endswith(".log")]
+    constuct_si(log_files)
