@@ -14,5 +14,3 @@ Get xyz of atoms in sumfile
 ---------------------------
 
 .. autofunction:: subproptools.qtaim_extract.get_xyz
-
-
