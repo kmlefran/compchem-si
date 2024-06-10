@@ -25,6 +25,7 @@ Welcome to compchem-si's documentation!
    :caption: compchem-si API:
 
    api
+   generated/compchem_si.si_generation.rst
 
 Indices and tables
 ==================

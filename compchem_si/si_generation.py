@@ -211,7 +211,7 @@ def parse_log_file(log_file):
     return energy, geom_array
 
 
-def constuct_si(log_file_list="dir", out_name="SupplementaryInformation.pdf"):
+def construct_si(log_file_list="dir", out_name="SupplementaryInformation.pdf"):
     """Construct the Supplementary Information
 
     Args:
@@ -281,4 +281,4 @@ def _supporting_info_page(story, energy, geom, log_file):
 
 if __name__ == "__main__":
     log_files = [file for file in os.listdir() if file.endswith(".log")]
-    constuct_si(log_files)
+    construct_si(log_files)
