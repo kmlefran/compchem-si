@@ -1,5 +1,5 @@
-Property Extraction Usage
-=========================
+SI Generations Usage
+====================
 
 Installation
 ------------
@@ -10,7 +10,7 @@ To use compchem-si, first install it using pip:
 
    (.venv) $ pip install compchem-si
 
-Get xyz of atoms in sumfile
----------------------------
+Generate SI for a Set of log files
+----------------------------------
 
-.. autofunction:: subproptools.qtaim_extract.get_xyz
+.. autofunction:: compchem-si.si_generation.construct_si

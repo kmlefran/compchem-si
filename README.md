@@ -17,4 +17,20 @@ pip install compchem-si
 ```
 
 # Example Usage:
+If you are in a working directory with all of your .log files that you want in the SI, you can run the following to generate the SI as SupplementaryInformation.pdf
 ```python
+constuct_si()
+```
+
+Alternatively, if you only want some of the files to be included in the SI, run:
+```python
+constuct_si(log_file_list = ['log1.log', 'log2.log',...],out_name="my_si_name.pdf")
+```
+
+# Features to Develop
+1. Handle non-optimization jobs
+2. Include more features in SI file
+3. Optimize formatting of SI
+
+# Note
+This is an initial release, the SI page format is pretty barebones for now, but will be improved over time
