@@ -10,10 +10,10 @@ import sys
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import sphinx_rtd_theme
 
-project = "subproptools"
-copyright = "2023, Kevin Lefrancois-Gagnon, Robert Mawhinney"
+project = "compchem-si"
+copyright = "2024, Kevin Lefrancois-Gagnon, Robert Mawhinney"
 author = "Kevin Lefrancois-Gagnon, Robert Mawhinney"
-release = "0.2.0"
+release = "0.1.0"
 
 
 extensions = [

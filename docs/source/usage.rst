@@ -13,4 +13,4 @@ To use compchem-si, first install it using pip:
 Generate SI for a Set of log files
 ----------------------------------
 
-.. autofunction:: compchem-si.si_generation.construct_si
+.. autofunction:: compchem_si.si_generation.construct_si

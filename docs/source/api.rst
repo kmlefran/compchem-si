@@ -4,5 +4,4 @@ API
 .. autosummary::
     :toctree: generated
 
-    subproptools.qtaim_extract
-    subproptools.sub_reor
+    compchem_si.si_generation
