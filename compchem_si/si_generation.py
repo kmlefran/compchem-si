@@ -9,6 +9,7 @@ import subprocess
 
 import cclib
 import numpy as np
+from reportlab.lib import colors
 
 # from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -143,21 +144,29 @@ no_to_symb = {
 }
 
 
-def _get_geom(data):
+def _get_geom(data, calc_type):
     """Gets the geometry of the optimized structure from cclib parsed data
 
     Args:
         data: cclib data
-
+        calc_type: the calculation type of the .log file, from _determine_calctype
     Returns:
         geometry as a list of lists with symbols and xyz coordinates
 
     """
-    opt_geom = data.atomcoords[data.OPT_DONE - 1]
+    if calc_type not in ["freq", "opt", "opt+freq", "singlepoint"]:
+        raise ValueError(
+            f"Calculation type {calc_type} passed to _get_geom is not a supported type."
+        )
+    if calc_type in ["freq", "singlepoint"]:
+        opt_geom = data.atomcoords[0]
+    else:
+        opt_geom = data.atomcoords[-1]
     atom_symb = [no_to_symb[no] for no in data.atomnos]
+    mol_formula = _get_molformula(atom_symb)
     geom_array = np.c_[np.array(atom_symb), opt_geom]
     geom_list = list(list(el) for el in geom_array)
-    return geom_list
+    return geom_list, mol_formula
 
 
 def _write_image(data, log_file):
@@ -178,7 +187,9 @@ def _write_image(data, log_file):
 
     xyz_file = log_file.replace(".log", ".xyz")
     png_file = log_file.replace(".log", ".png")
-    cclib.io.ccwrite(data, "xyz", f"xyz_files/{xyz_file}", indices=data.OPT_DONE - 1)
+    cclib.io.ccwrite(
+        data, "xyz", f"xyz_files/{xyz_file}", indices=len(data.atomcoords) - 1
+    )
     subprocess.check_output(
         [
             "obabel",
@@ -194,21 +205,75 @@ def _write_image(data, log_file):
     )
 
 
+def _determine_calctype(data):
+    """Takes cclib data and checks its keys to determine what type of calculation was run
+
+    Args:
+        data: ouput of cclib.io.ccread
+
+    Returns:
+        one of the supported calculation types(opt, freq, opt+freq, singlepoint, modredundant)
+
+    """
+    dict_data = data.getattributes()
+    if "vibfreqs" in dict_data and "geotargets" in dict_data:
+        return "opt+freq"
+    if "vibfreqs" in dict_data:
+        return "freq"
+    if "scancoords" in dict_data:
+        return "modredundant"
+    if "geotargets" in dict_data:
+        return "opt"
+    return "singlepoint"
+
+
+def _get_molformula(at_symbs):
+    """Converts list of atomic symbols to molecular formula"""
+    out_dict = {s: at_symbs.count(s) for s in set(at_symbs)}
+    out_str = ""
+    # sort alphabetically by key
+    sorted_dict = dict(sorted(out_dict.items()))
+    for key, value in sorted_dict.items():
+        if value != 1:
+            out_str += f"{key}{value}"
+        else:
+            # 1 atom, don't put the number
+            out_str += f"{key}"
+    return out_str
+
+
 def parse_log_file(log_file):
     """Take a log file and get the geometry and energy values
 
     Args:
         log_file: the name of a .log file
-
+        calc_type: type of the calculation
     Returns:
         the energy and geometry of the molecule in the .log file, and an image written to log_file.png
 
     """
     data = cclib.io.ccread(log_file)
-    geom_array = _get_geom(data)
-    energy = data.scfenergies[data.OPT_DONE - 1]
-    _write_image(data, log_file)
-    return energy, geom_array
+    calc_type = _determine_calctype(data)
+    if calc_type != "modredundant":
+        geom_array, mol_formula = _get_geom(data, calc_type)
+        if calc_type in ["opt", "opt+freq"]:
+            energy = data.scfenergies[-1]
+        else:
+            energy = data.scfenergies[0]
+        _write_image(data, log_file)
+    if len(list(set(data.metadata["methods"]))) > 1:
+        raise Warning(
+            f"Multiple different electronic structure methods detected for {log_file}, only returning first"
+        )
+    out_dict = {
+        "energy": energy,
+        "geom": geom_array,
+        "method": data.metadata["methods"][0],
+        "basis": data.metadata["basis_set"],
+        "calc_type": calc_type,
+        "mol_formula": mol_formula,
+    }
+    return out_dict
 
 
 def construct_si(log_file_list="dir", out_name="SupplementaryInformation.pdf"):
@@ -241,22 +306,22 @@ def construct_si_page(log_file, story):
         the story input updated with the current page being built
 
     """
-    energy, geom = parse_log_file(log_file)
-    story = _supporting_info_page(story, energy, geom, log_file)
+    print(log_file)
+    cc_dict = parse_log_file(log_file)
+    story = _supporting_info_page(story, cc_dict, log_file)
     return story
 
 
-def _supporting_info_page(story, energy, geom, log_file):
+def _supporting_info_page(story, cc_dict, log_file):
     """Construct a SI page for a given molecule
 
     Args:
         story: list containing platypus flowables from reportlab for the document being built
-        Energy: the energy for the molecule in the .log file
-        geom: list[list] the geometry of the molecule
-        log_file: the log file name
+        cc_dict: dictionary containing information on the calculation, from parse_log_file
 
     Returns:
         the story input updated with the current page being built
+
     """
 
     p = Paragraph("<font size=20>Structure</font>")
@@ -267,13 +332,22 @@ def _supporting_info_page(story, energy, geom, log_file):
     I.drawHeight = 2 * inch
     I.drawWidth = 2 * inch
     story.append(I)
-    p = Paragraph(f"<font size=20>Energy</font>: {energy}")
-    story.append(p)
     story.append(Spacer(1, 0.2 * inch))
-    p = Paragraph("<font size=20>Geometry</font>")
-    story.append(p)
-    story.append(Spacer(1, 0.2 * inch))
-    t = Table(geom)
+    data = [
+        ["Method:", cc_dict["method"], "Geometry"],
+        ["Basis Set:", cc_dict["basis"], Table(cc_dict["geom"])],
+        ["Calculation Type:", cc_dict["calc_type"], ""],
+        ["Energy:", cc_dict["energy"], ""],
+        ["Molecular Formula:", cc_dict["mol_formula"], ""],
+    ]
+
+    t = Table(
+        data,
+        style=[
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("SPAN", (-1, 1), (-1, -1)),
+        ],
+    )
     story.append(t)
     story.append(PageBreak())
     return story
